@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Classroom QR Scanner Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        #reader {
+            width: 100%;
+            border: none !important;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+        #reader__dashboard {
+            background-color: #f8f9fa !important;
+            padding: 15px !important;
+            border-radius: 0.5rem;
+        }
+        button {
+            font-weight: bold !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+
+    <div class="mb-4 d-flex justify-content-between align-items-center bg-white p-3 rounded shadow-sm">
+        <span class="fw-bold text-dark text-uppercase">🧭 Workspace Hub:</span>
+        <div>
+            <a th:href="@{/}" class="btn btn-dark btn-sm fw-bold me-2"><i class="bi bi-house-door-fill me-1"></i> 🏠 Home</a>
+            <a th:href="@{/admin/students}" class="btn btn-outline-dark btn-sm fw-bold me-2">👥 Students Directory</a>
+            <a th:href="@{/admin/subjects}" class="btn btn-outline-dark btn-sm fw-bold me-2">📚 Course Subjects</a>
+            <a th:href="@{/admin/attendance}" class="btn btn-outline-dark btn-sm fw-bold me-2">📅 Take Attendance</a>
+            <a th:href="@{/admin/attendance/report-selector}" class="btn btn-outline-dark btn-sm fw-bold">📊 Analytics Reports</a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-7">
+            <div class="card shadow border-0 h-100">
+                <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-camera-video me-2 text-info"></i>Live Tracking Video Stream</h5>
+                    <span class="badge bg-secondary fw-semibold">Webcam Feed Active</span>
+                </div>
+                <div class="card-body p-4 bg-white d-flex flex-column justify-content-center">
+                    <div id="reader" class="shadow-sm border rounded-3 bg-light"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="card shadow border-0 h-100">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0 fw-bold" th:text="${subject.subjectName}">Subject Name</h5>
+                    <small class="text-white-50 fw-bold">📅 Tracking Date: <span id="sessionDate" th:text="${date}">2026-05-24</span></small>
+                </div>
+                <div class="card-body p-4 bg-white d-flex flex-column">
+                    <h6 class="fw-bold text-uppercase tracking-wider text-secondary small mb-3">Live Feed Logger Activity:</h6>
+
+                    <div id="scanLogFeed" class="p-3 bg-light rounded text-monospace border shadow-inner flex-grow-1 overflow-auto small mb-4" style="min-height: 250px; max-height: 350px;">
+                        <div class="text-muted"><i class="bi bi-info-circle me-1"></i> Waiting for camera authorization initialization...</div>
+                    </div>
+
+                    <input type="hidden" id="subjectIdField" th:value="${subject.id}" />
+                    <a th:href="@{/admin/attendance}" class="btn btn-outline-dark w-100 fw-bold py-2"><i class="bi bi-arrow-left-circle me-2"></i>Close Scanning Console</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const subjectId = document.getElementById("subjectIdField").value;
+    const dateStr = document.getElementById("sessionDate").innerText;
+    const logFeed = document.getElementById("scanLogFeed");
+
+    let lastScannedCode = "";
+    let lastScanTime = 0;
+
+    function appendToLog(message, isSuccess) {
+        const timestamp = new Date().toLocaleTimeString();
+        const alertClass = isSuccess ? "text-success fw-bold" : "text-danger fw-semibold";
+        const icon = isSuccess ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill";
+
+        const logEntry = document.createElement("div");
+        logEntry.className = `mb-2 p-2 rounded bg-white border shadow-sm ${alertClass}`;
+        logEntry.innerHTML = `<code>[${timestamp}]</code> <i class="bi ${icon} me-1"></i> ${message}`;
+
+        // Remove default boilerplate text placeholder message node trace if it exists
+        if(logFeed.querySelector('.text-muted')) {
+            logFeed.innerHTML = "";
+        }
+
+        logFeed.insertBefore(logEntry, logFeed.firstChild);
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+        const currentTime = new Date().getTime();
+
+        // 1. Debounce protection filter layer: Ignore rapid repeat scans of the exact same pass card within 4 seconds
+        if (decodedText === lastScannedCode && (currentTime - lastScanTime < 4000)) {
+            return;
+        }
+
+        lastScannedCode = decodedText;
+        lastScanTime = currentTime;
+
+        // 2. Play subtle alert notification sound effects via standard synthetic hardware frequency tones
+        try {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = context.createOscillator();
+            const gain = context.createGain();
+            osc.type = "sine";
+            osc.frequency.value = 880; // High crisp tone
+            gain.gain.setValueAtTime(0.1, context.currentTime);
+            osc.connect(gain);
+            gain.connect(context.destination);
+            osc.start();
+            osc.stop(context.currentTime + 0.1);
+        } catch(e) {}
+
+        // 3. Construct modern browser form element payload values to submit into Spring API pipeline via AJAX
+        const formData = new URLSearchParams();
+        formData.append("subjectId", subjectId);
+        formData.append("date", dateStr);
+        formData.append("kid", decodedText);
+
+        // 4. Asynchronously commit check-in records to our custom REST backend endpoint controller layout mapping
+        fetch("/admin/attendance/scan-checkin", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                // Injects Spring Security CSRF tokens automatically inside asynchronous fetch execution pools
+                "X-CSRF-TOKEN": /*[[${_csrf.token}]]*/ ''
+            },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text) });
+            }
+            return response.text();
+        })
+        .then(dataMsg => {
+            appendToLog(dataMsg, true);
+        })
+        .catch(errorMsg => {
+            appendToLog(errorMsg, false);
+        });
+    }
+
+    // Initialize HTML5 QR Code Object scanner instance
+    const html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", { fps: 10, qrbox: 250, rememberLastUsedCamera: true });
+    html5QrcodeScanner.render(onScanSuccess);
+</script>
+
+</body>
+</html>
